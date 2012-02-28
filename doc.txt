@@ -115,12 +115,6 @@ main.rkt
 
 The following utilities are defined in main.rkt:
 
-> (with-output-to-string e1 e2 ...) :: syntax
-
-Evaluates the expressions e1 e2 ..., capturing all standard output during the
-dynamic extent of the evaluation into a string. The entire expression evaluates
-to the string.
-
 > (with-temporary-file file (args ...) e1 e2 ...) :: syntax
 
 Creates a temporary file by applying `make-temporary-file' to the list of
