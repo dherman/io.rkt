@@ -1,0 +1,290 @@
+_I/O_
+_io_
+
+This collection provides two files:
+
+ _file.rkt_: utilities for files and paths
+ _main.rkt_: utilities for I/O
+
+The I/O library provides a number of utilities for performing binary and
+character-based I/O.
+
+======================================================================
+
+file.rkt
+--------
+
+> relative-path/c :: contract
+
+Contract for string or path values that represent relative paths. The contract
+does not access the filesystem.
+
+> relative-file-path/c :: contract
+
+Contract for string or path values that represent relative paths of files that
+actually exist. The contract always accesses the filesystem.
+
+> relative-directory-path/c :: contract
+
+Contract for string or path values that represent relative paths of directories
+that actuall exist. The contract always accesses the filesystem.
+
+> complete-path/c :: contract
+> relative-file-path/c :: contract
+> relative-directory-path/c :: contract
+
+Analogous to their relative-* counterparts, but for complete file paths.
+
+> (dirname path) :: (union string path) -> path
+
+Similar to the Unix utility of the same name; returns the part of the given path
+that represents the directory containing the given file or directory. This
+procedure never accesses the filesystem.
+
+> (basename path) :: (union string path) -> path
+
+Similar to the Unix utility of the same name; returns the part of the given path
+that represents the file or directory without any path information describing
+the directory that contains it. This procedure never accesses the filesystem.
+
+> (path->relative-path path [relative-to]) :: (union string path) [(union string path)] -> relative-path
+
+Converts a path or path string to a relative path, relative to the directory
+specified by `relative-to', which defaults to the value of `current-directory'.
+
+> (explode-relative-path path) :: relative-path -> (listof path)
+
+Returns the list of relative directories that constitute `path'. The `path' must
+be simplified in the sense of _simplify-path_ (i.e., should not contain
+up-directory or same-directory indicators) and expanded in the sense of
+_expand-path_ (i.e., should not contain ``~'').
+
+This procedure does not access the filesystem.
+
+> (telescope-path path) :: complete-path -> (listof complete-path)
+
+Returns the list of path prefixes of `path'. The `path' must be complete,
+simplified in the sense of _simplify-path_ (i.e., should not contain
+up-directory or same-directory indicators), and expanded in the sense of
+_expand-path_ (i.e., should not contain ``~'').
+
+The paths are returned in decreasing order, so the first element in the list is
+_path=?_ to `path'.
+
+This procedure does not access the filesystem.
+
+> (telescope-relative-path path) :: relative-path -> (listof relative-path)
+
+Returns the list of relative path prefixes of `path'. The `path' must be
+relative, simplified in the sense of _simplify-path_ (i.e., should not contain
+up-directory or same-directory indicators), and expanded in the sense of
+_expand-path_ (i.e., should not contain ``~'').
+
+The paths are returned in decreasing order, so the first element in the list is
+_path=?_ to `path'.
+
+This procedure does not access the filesystem.
+
+> (directory-list/all [dir]) :: [(union string path)] -> (listof relative-path)
+
+Returns the list of all files and subdirectories in the entire directory
+hierarchy under `dir', which defaults to the value of the `current-directory'
+parameter. The paths in the list are relative to `dir'.
+
+This procedure accesses the filesystem.
+
+> (empty-directory? p) :: (union string path) -> boolean
+
+Returns #t if `p' refers to an existing empty directory. This procedure accesses
+the filesystem.
+
+> path=? :: path path ... -> boolean
+
+Compares two or more paths to see if they contain the same elements. The paths
+are not simplified or normalized in any way. This procedure never accesses the
+filesystem.
+
+> path-normalized=? :: path path ... -> boolean
+
+Compares two or more paths to see if they refer to the same file in the
+filesystem. The paths are normalized with _normalize-path_ before
+comparison. This procedure always accesses the filesystem.
+
+main.rkt
+--------
+
+The following utilities are defined in main.rkt:
+
+> (with-output-to-string e1 e2 ...) :: syntax
+
+Evaluates the expressions e1 e2 ..., capturing all standard output during the
+dynamic extent of the evaluation into a string. The entire expression evaluates
+to the string.
+
+> (with-temporary-file file (args ...) e1 e2 ...) :: syntax
+
+Creates a temporary file by applying `make-temporary-file' to the list of
+argument expressions `args ...' and binds the resulting file path to the
+variable given as `file'; the file exists while the expressions `e1 e2 ...' are
+evaluated, and is deleted automatically when evaluation of the expressions
+terminates or control leaves abnormally (due to an exception or continuation
+invocation).
+
+Note that if control leaves and reenters the body of the expression, the
+temporary file will no longer exist, because it is deleted the first time
+control leaves the body.
+
+> (seekable-port? port) :: port -> boolean
+
+Determines whether a port is seekable, i.e., whether the `file-position'
+procedure should succeed on the port. This procedure does perform I/O, but does
+not change the current offset in the port.
+
+> (make-filter-input-port transform [in close-orig?]) :: (input-port output-port -> any) [input-port boolean] -> input-port
+
+Creates an input port wrapper around the given input port. As bytes are read
+from the underlying input port, the transformer is used to transform the bytes;
+whatever bytes are written to the output port of the transformer procedure are
+produced as the results of reading from the new input port.
+
+The original input port is automatically closed when the filter input port is
+closed if the value of `close-orig?' is not #f; the default value is #f.
+
+> (bit-set? i num) :: nat exact-integer -> boolean
+
+Determines whether bit `i' is enabled in the exact integer `num'.
+
+> (stretch-bytes bytes len [big-endian? fill-byte]) :: bytes nat [boolean byte] -> bytes
+
+Produces a byte string of length `len', with enough copies of `fill-byte'
+prefixed or appended to the bytes in the given byte string, where the order of
+the bytes is determined by the value of `big-endian?'.
+
+The value of `big-endian?' defaults to the value returned by
+`system-big-endian?', and the default value of `fill-byte' is 0.
+
+> (bytes->integer bytes signed? [big-endian? start-k end-k]) :: bytes boolean [boolean nat nat] -> exact-integer
+
+Converts a byte string to an exact integer. The byte order is given by the value
+of `big-endian?', which defaults to the value returned by
+`system-big-endian?'. If `signed?' is true, the integer is decoded with two's
+complement, otherwise it is decoded as an unsigned bit stream.
+
+If `start-k' is given, the integer is decoded starting at index `start-k'
+(inclusive). If `end-k' is given, the decoding stops at index `end-k'
+(exclusive).
+
+> (integer->bytes n signed? [big-endian? size-n]) :: exact-integer boolean [boolean (union #f nat)] -> bytes
+
+Converts an exact integer to a byte string. The byte order is given by the value
+of `big-endian?', which defaults to the value returned by
+`system-big-endian?'. If `signed?' is true, the integer is encoded with two's
+complement, otherwise it is encoded as an unsigned bit stream.
+
+If `size-n' is not #f, then the integer is encoded in a byte string of length
+`size-n', if it fits. If `n' cannot be encoded in a string of the requested size
+and format, the exn:fail:contract exception is raised.
+
+INPUT ----------------------------------------------------------------
+
+> (skip-bytes k [in]) :: nat [input-port] -> any
+
+Skips `k' bytes from the input port `in'. The value of the `current-input-port'
+parameter is used by default.
+
+> (read-integer k signed? [in big-endian?]) :: nat boolean [input-port boolean] -> exact-integer
+
+Reads a `k'-byte integer from the input port `in', with the byte order given by
+`big-endian?'. If `signed?' is true, the integer is decoded with two's
+complement, otherwise it is decoded as an unsigned bit stream. The value of the
+`current-input-port' parameter is used as the default value of `in', and the
+value returned by `system-big-endian?' is used as the default byte order.
+
+> (read-chars k [in]) :: nat [input-port] -> (listof char)
+
+Reads `k' characters from the input port `in' and returns them in a list. The
+value of the `current-input-port' parameter is used as the default value of
+`in'.
+
+> (read-c-string [in]) :: [input-port] -> bytes
+
+Reads a C-style byte string from the input port `in', which defaults to the
+value of the parameter `current-input-port'. A C-style string is terminated by a
+null character or EOF.
+
+> (read-c-string! bytes [in start-k end-k]) :: bytes input-port nat nat -> eof or nat
+
+Reads a C-style byte string from the input port `in', and stores the bytes in
+the given byte string starting at byte number `start-k' and until reaching a
+null character, EOF, or byte number `end-k', whichever comes first.
+
+If no characters are read before reaching EOF, the eof-object is
+returned. Otherwise the total number of bytes read is returned.
+
+The value of `in' defaults to the value of the parameter `current-input-port',
+and the values of `start-k' and `end-k' default to 0 and the length of the given
+byte string, respectively.
+
+> (read-lines [in mode-symbol]) -> (listof string)
+
+Reads all the lines in an input port until reaching the end of input. The
+`mode-symbol' determines what end-of-line sequences are recognized. See the
+documentation of _read-line_ for the possible values of `mode-symbol'.
+
+The value of `in' defaults to the value of the parameter `current-input-port',
+and the value of `mode-symbol' defaults to 'linefeed.
+
+> (peek-chars k [in]) :: nat [input-port] -> (listof char)
+> (peek-integer k [in big-endian?]) :: nat [input-port boolean] -> exact-integer
+
+Same as their read-* counterparts, but do not advance the input port cursor.
+
+OUTPUT ---------------------------------------------------------------
+
+> (write-c-string s [out start-k end-k]) :: bytes [output-port nat nat] -> any
+
+Writes a C-style (#\nul-terminated) byte string to an output port.
+
+The substring from `start-k' (inclusive) to `end-k' (exclusive) is written to
+the output port. By default, the entire string is written.
+
+> (write-integer n signed? [out big-endian? size-n]) :: exact-integer boolean [output-port boolean (union #f nat)] -> any
+
+Writes the integer `n' to the output port `out', with the byte order given by
+`big-endian?'. If `signed?' is true, the integer is encoded with two's
+complement, otherwise it is encoded as an unsigned bit stream. The value of the
+`current-output-port' parameter is used as the default value of `out', and the
+value returned by `system-big-endian?' is used as the default byte order.
+
+If `size-n' is #f, the integer is written with the minimum number of bytes
+required, rounded up to the nearest power of 2. Otherwise the value of `size-n'
+is used as the number of bytes. If the integer cannot be encoded in `size-n'
+bytes, an exn:fail:contract is raised.
+
+> (write-chars chars [out]) :: (listof char) [output-port] -> any
+
+Writes a sequence of characters to the specified output port, which defaults to
+the value of the parameter `current-output-port'.
+
+> (write-lines lines [out]) :: (listof string) [output-port] -> any
+
+Writes a sequence of strings to the specified output port, which defaults to the
+value of the parameter `current-output-port', separating each string with a
+newline.
+
+EXAMPLES -------------------------------------------------------------
+
+The following code snippet demonstrates a common usage pattern for the binary
+I/O utilities in this library. A simple local procedure abstracts the byte order
+and input port for the local code, and the LET* block presumably follows the
+specification for the binary layout of some file format. Note how the use of
+LET* allows elements to be read with content length specified by previous
+elements.
+
+...
+(let ([read-int (lambda (k) (read-integer k #f in #t))])
+ (let* ([magic (read-int   4)]
+        [len   (read-int   4)]
+        [str   (read-bytes len in)])
+   str))
+...
